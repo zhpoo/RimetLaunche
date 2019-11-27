@@ -22,7 +22,7 @@ import top.zhpoo.rimetlauncher.util.Logger;
 
 public class MainActivity extends AppCompatActivity implements OnClickListener {
 
-    private static final int BACK_DELAY_MILLIS = 6 * 1000;
+    private static final int BACK_DELAY_MILLIS = 30 * 1000;
     private static final long ONE_DAY = 24 * 60 * 60 * 1000;
 
     private final Handler mHandler = new Handler();
