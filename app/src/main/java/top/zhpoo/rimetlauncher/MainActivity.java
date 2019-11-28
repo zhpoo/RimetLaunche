@@ -7,22 +7,23 @@ import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Handler;
+import android.text.TextUtils;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
-import android.widget.TextView;
+import android.widget.EditText;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
-
 import java.util.Calendar;
+import java.util.Random;
 
 import top.zhpoo.rimetlauncher.Constants.PackageName;
 import top.zhpoo.rimetlauncher.util.Logger;
 
-public class MainActivity extends AppCompatActivity implements OnClickListener {
+public class MainActivity extends AgileActivity implements OnClickListener {
 
-    private static final int BACK_DELAY_MILLIS = 30 * 1000;
+    private static final int DEFAULT_BACK_DELAY_MILLIS = 30 * 1000;
     private static final long ONE_DAY = 24 * 60 * 60 * 1000;
 
     private final Handler mHandler = new Handler();
@@ -34,6 +35,7 @@ public class MainActivity extends AppCompatActivity implements OnClickListener {
         Logger.d("back .");
         start();
     };
+    private int backDelayMillis = DEFAULT_BACK_DELAY_MILLIS;
 
     private final Runnable mRunnable = () -> {
         final Context context = App.getContext();
@@ -47,11 +49,15 @@ public class MainActivity extends AppCompatActivity implements OnClickListener {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         context.startActivity(intent);
         Logger.d("ding .");
-        mHandler.postDelayed(mBackRunner, BACK_DELAY_MILLIS);
+        mHandler.postDelayed(mBackRunner, backDelayMillis);
     };
     private Button mButton;
-    private TextView mTvInfo;
     private CountDownTimer mTimer;
+
+    private Button mBtnWorkTime;
+    private Button mBtnOffTime;
+    private EditText mEtStayInDingdingTime;
+    private EditText mEtFloatingTime;
 
     private Integer mHour1;
     private Integer mMinute1;
@@ -59,22 +65,35 @@ public class MainActivity extends AppCompatActivity implements OnClickListener {
     private Integer mHour2;
     private Integer mMinute2;
 
+
+    @Override
+    protected boolean autoHideKeyboardOnTouchEditTextOutside(MotionEvent ev) {
+        return true;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        mTvInfo = findViewById(R.id.tv_info);
         mButton = findViewById(R.id.button);
         mButton.setOnClickListener(this);
-        findViewById(R.id.btn_work_time).setOnClickListener(this);
-        findViewById(R.id.btn_off_time).setOnClickListener(this);
+
+        mBtnWorkTime = findViewById(R.id.btn_work_time);
+        mBtnOffTime = findViewById(R.id.btn_off_time);
+        mEtStayInDingdingTime = findViewById(R.id.et_stay_in_dingding_time);
+        mEtFloatingTime = findViewById(R.id.et_floating_time);
+
+        mBtnWorkTime.setOnClickListener(this);
+        mBtnOffTime.setOnClickListener(this);
         updateSettingText();
     }
 
     private void updateSettingText() {
-        String time1 = mHour1 == null ? "-" : twoDigits(mHour1) + ":" + twoDigits(mMinute1);
-        String time2 = mHour2 == null ? "-" : twoDigits(mHour2) + ":" + twoDigits(mMinute2);
-        mTvInfo.setText(getString(R.string.currentSetting, time1, time2));
+        String time1 = mHour1 == null ? "" : "\n" + twoDigits(mHour1) + ":" + twoDigits(mMinute1);
+        String time2 = mHour2 == null ? "" : "\n" + twoDigits(mHour2) + ":" + twoDigits(mMinute2);
+
+        mBtnWorkTime.setText(getString(R.string.setupTime1, time1));
+        mBtnOffTime.setText(getString(R.string.setupTime2, time2));
     }
 
     private String twoDigits(long value) {
@@ -101,8 +120,11 @@ public class MainActivity extends AppCompatActivity implements OnClickListener {
                 if (isRunning()) {
                     stop();
                     mButton.setText(R.string.start);
-                } else {
-                    start();
+                    mEtFloatingTime.setEnabled(true);
+                    mEtStayInDingdingTime.setEnabled(true);
+                } else if (start()) {
+                    mEtFloatingTime.setEnabled(false);
+                    mEtStayInDingdingTime.setEnabled(false);
                 }
                 break;
             case R.id.btn_work_time:
@@ -132,7 +154,7 @@ public class MainActivity extends AppCompatActivity implements OnClickListener {
         }
     }
 
-    private void start() {
+    private boolean start() {
         stop();
 
         final long current = System.currentTimeMillis();
@@ -158,7 +180,7 @@ public class MainActivity extends AppCompatActivity implements OnClickListener {
         }
         if (before == null && after == null) {
             toast(R.string.setupTimeTips1);
-            return;
+            return false;
         }
         if (before == null) {
             before = Calendar.getInstance();
@@ -189,8 +211,37 @@ public class MainActivity extends AppCompatActivity implements OnClickListener {
 
         long delay = next.getTimeInMillis() - current;
 
+        String floatingTime = mEtFloatingTime.getText().toString().trim();
+        if (!TextUtils.isEmpty(floatingTime)) {
+            try {
+                int i = Math.abs(Integer.parseInt(floatingTime));
+                int randomInt = new Random().nextInt(i * 2) - i;
+                delay += randomInt * 60 * 1000;
+            } catch (NumberFormatException e) {
+                toast(R.string.invalidNumber);
+                mEtFloatingTime.setText("");
+            }
+        }
+
+        backDelayMillis = DEFAULT_BACK_DELAY_MILLIS;
+        String backTimeStr = mEtStayInDingdingTime.getText().toString().trim();
+        if (!TextUtils.isEmpty(backTimeStr)) {
+            try {
+                int backTime = Integer.parseInt(backTimeStr);
+                if (backTime <= 0) {
+                    mEtStayInDingdingTime.setText("");
+                } else {
+                    backDelayMillis = backTime * 1000;
+                }
+            } catch (NumberFormatException e) {
+                toast(R.string.invalidNumber);
+                mEtStayInDingdingTime.setText("");
+            }
+        }
+
         start(delay);
         startTimer(delay);
+        return true;
     }
 
     private void toast(int resId) {
@@ -212,7 +263,7 @@ public class MainActivity extends AppCompatActivity implements OnClickListener {
                 long minute = millisUntilFinished / 1000 / 60 % 60;
                 long second = millisUntilFinished / 1000 % 60;
                 String leftTime = twoDigits(hour) + ":" + twoDigits(minute) + ":" + twoDigits(second);
-                mButton.setText(getString(R.string.exchangeTime, leftTime, BACK_DELAY_MILLIS / 1000));
+                mButton.setText(getString(R.string.exchangeTime, leftTime, backDelayMillis / 1000));
             }
 
             @Override

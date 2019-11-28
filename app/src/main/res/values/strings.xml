@@ -1,13 +1,17 @@
 <resources>
     <string name="app_name">Rimet</string>
-    <string name="desc">使用方式：\n1、设置手机屏幕永不息屏，插上充电器保证手机电量充足\n2、登录钉钉并设置钉钉为极速打卡，保证手机处于打卡范围之内\n3、点击设置时间，确保设置的时间点在钉钉极速打卡时间段之内\n4、点击启动，并保持本 app 处于前台\n\n工作原理：\n在设置的时间点从后台打开钉钉，钉钉自动极速打卡。\n\n特点：\n安全、省心，无副作用。</string>
+    <string name="desc">使用说明：\n1、设置手机屏幕永不息屏，插上充电器保证手机电量充足\n2、登录钉钉并设置钉钉为极速打卡，保证手机处于打卡范围之内\n3、点击设置时间，确保设置的时间点在钉钉极速打卡时间段之内\n4、点击启动，并保持本 app 处于前台</string>
     <string name="start">启动</string>
     <string name="stop">停止</string>
-    <string name="currentSetting">当前设置：\n时间1：%s\n时间2：%s</string>
-    <string name="setupTime1">设置时间1</string>
-    <string name="setupTime2">设置时间2</string>
+    <string name="setupTime1">时间1%s</string>
+    <string name="setupTime2">时间2%s</string>
     <string name="setupTimeTips1">请先设置时间</string>
     <string name="setupTimeTips2">只设置了一个时间</string>
-    <string name="exchangeTime">%s 后启动钉钉\n并在 %d 秒后自动返回\n(点击停止)</string>
+    <string name="exchangeTime">%s 后启动钉钉，并在 %d 秒后自动返回\n(点击停止)</string>
     <string name="stopTips">请先停止</string>
+    <string name="stay_in_dingding_time">停留在钉钉时长（秒）</string>
+    <string name="stay_in_dingding_time_hint">默认 30</string>
+    <string name="floating_time">时间随机浮动（分钟）</string>
+    <string name="floating_time_hint">默认 0，不浮动</string>
+    <string name="invalidNumber">输入不正确，已自动忽略</string>
 </resources>
