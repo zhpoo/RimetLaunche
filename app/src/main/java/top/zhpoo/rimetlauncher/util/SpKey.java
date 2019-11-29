@@ -7,4 +7,5 @@ public interface SpKey {
     String TIME_MINUTE2 = "minute2";
     String TIME_FLOATING_MINUTES = "timeFloatingMinutes";
     String BACK_DELAY_SECONDS = "backTimeSeconds";
+    String WEEKDAYS_STATE = "weekdaysState";
 }

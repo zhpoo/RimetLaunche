@@ -26,7 +26,7 @@ import top.zhpoo.rimetlauncher.util.Toasts;
 public class MainActivity extends AgileActivity implements OnClickListener {
 
     private static final int DEFAULT_BACK_DELAY_SECONDS = 30;
-    private static final long ONE_DAY = 24 * 60 * 60 * 1000;
+    private static final int DEFAULT_WEEKDAYS_STATE = 0x000000ff >> 1;
 
     private final Handler mHandler = new Handler();
 
@@ -61,12 +61,15 @@ public class MainActivity extends AgileActivity implements OnClickListener {
     private Button mBtnOffTime;
     private EditText mEtBackDelaySeconds;
     private EditText mEtFloatingTimeMinutes;
+    private WeekdaysChecker mWeekdaysChecker;
 
     private Integer mHour1;
     private Integer mMinute1;
 
     private Integer mHour2;
     private Integer mMinute2;
+
+    private Integer mWeekdaysCheckedStates;
 
     @Override
     protected boolean autoHideKeyboardOnTouchEditTextOutside(MotionEvent ev) {
@@ -82,6 +85,7 @@ public class MainActivity extends AgileActivity implements OnClickListener {
 
         mBtnWorkTime = findViewById(R.id.btn_work_time);
         mBtnOffTime = findViewById(R.id.btn_off_time);
+        mWeekdaysChecker = findViewById(R.id.weekdays_checker);
         mEtBackDelaySeconds = findViewById(R.id.et_stay_in_dingding_time);
         mEtFloatingTimeMinutes = findViewById(R.id.et_floating_time);
 
@@ -98,6 +102,8 @@ public class MainActivity extends AgileActivity implements OnClickListener {
 
         mEtFloatingTimeMinutes.setText(mFloatingTimeMinutes == null ? null : mFloatingTimeMinutes.toString());
         mEtFloatingTimeMinutes.setSelection(mEtFloatingTimeMinutes.getText().length());
+
+        mWeekdaysChecker.setCheckedState(mWeekdaysCheckedStates == null ? DEFAULT_WEEKDAYS_STATE : mWeekdaysCheckedStates);
     }
 
     private void readSavedSettings() {
@@ -113,6 +119,9 @@ public class MainActivity extends AgileActivity implements OnClickListener {
 
         spInt = sp.getInt(SpKey.TIME_MINUTE2, -1);
         mMinute2 = spInt == -1 ? null : spInt;
+
+        spInt = sp.getInt(SpKey.WEEKDAYS_STATE, -1);
+        mWeekdaysCheckedStates = spInt == -1 ? null : spInt;
 
         spInt = sp.getInt(SpKey.TIME_FLOATING_MINUTES, -1);
         mFloatingTimeMinutes = spInt == -1 ? null : spInt;
@@ -146,9 +155,11 @@ public class MainActivity extends AgileActivity implements OnClickListener {
                     mButton.setText(R.string.start);
                     mEtFloatingTimeMinutes.setEnabled(true);
                     mEtBackDelaySeconds.setEnabled(true);
+                    mWeekdaysChecker.setEnabled(true);
                 } else if (prepareStart() && start()) {
                     mEtFloatingTimeMinutes.setEnabled(false);
                     mEtBackDelaySeconds.setEnabled(false);
+                    mWeekdaysChecker.setEnabled(false);
                 }
                 break;
             case R.id.btn_work_time:
@@ -187,6 +198,14 @@ public class MainActivity extends AgileActivity implements OnClickListener {
             Toasts.show(R.string.setupTimeTips1);
             return false;
         }
+
+        int checkedState = mWeekdaysChecker.getCheckedState();
+        if (checkedState == 0) {
+            Toasts.show(R.string.weekdaysTips);
+            return false;
+        }
+        mWeekdaysCheckedStates = checkedState;
+        SpManager.getInstance().putInt(SpKey.WEEKDAYS_STATE, mWeekdaysCheckedStates);
 
         mFloatingTimeMinutes = 0;
         String floatingTime = mEtFloatingTimeMinutes.getText().toString().trim();
@@ -278,8 +297,15 @@ public class MainActivity extends AgileActivity implements OnClickListener {
         } else if (now.before(after)) {
             next = after;
         } else {
-            next = Calendar.getInstance();
-            next.setTimeInMillis(before.getTimeInMillis() + ONE_DAY);
+            before.add(Calendar.DAY_OF_MONTH, 1);
+            after.add(Calendar.DAY_OF_MONTH, 1);
+            next = before;
+        }
+
+        while (!isWeekdayChecked(next)) {
+            before.add(Calendar.DAY_OF_MONTH, 1);
+            after.add(Calendar.DAY_OF_MONTH, 1);
+            next = before;
         }
 
         long delay = next.getTimeInMillis() - current;
@@ -293,6 +319,11 @@ public class MainActivity extends AgileActivity implements OnClickListener {
         mHandler.postDelayed(mRunnable, delay);
         startTimer(delay);
         return true;
+    }
+
+    private boolean isWeekdayChecked(Calendar time) {
+        int weekdayIndex = time.get(Calendar.DAY_OF_WEEK) - 1;
+        return ((mWeekdaysCheckedStates >> weekdayIndex) & 1) == 1;
     }
 
     private void stop() {

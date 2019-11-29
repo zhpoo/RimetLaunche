@@ -10,8 +10,18 @@
     <string name="exchangeTime">%s 后启动钉钉，并在 %d 秒后自动返回\n(点击停止)</string>
     <string name="stopTips">请先停止</string>
     <string name="stay_in_dingding_time">停留在钉钉时长（秒）</string>
-    <string name="stay_in_dingding_time_hint">默认 30</string>
+    <string name="stay_in_dingding_time_hint">默认30</string>
     <string name="floating_time">时间随机浮动（分钟）</string>
-    <string name="floating_time_hint">默认 0，不浮动</string>
+    <string name="floating_time_hint">默认0，不浮动</string>
     <string name="invalidNumber">输入不正确，已自动忽略</string>
+    <string name="weekdaysTips">至少选择一天才能启动</string>
+    <string-array name="weekdays">
+        <item>日</item>
+        <item>一</item>
+        <item>二</item>
+        <item>三</item>
+        <item>四</item>
+        <item>五</item>
+        <item>六</item>
+    </string-array>
 </resources>
