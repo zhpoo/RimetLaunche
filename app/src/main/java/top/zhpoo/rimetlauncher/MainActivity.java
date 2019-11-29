@@ -13,17 +13,19 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.Toast;
 
 import java.util.Calendar;
 import java.util.Random;
 
 import top.zhpoo.rimetlauncher.Constants.PackageName;
 import top.zhpoo.rimetlauncher.util.Logger;
+import top.zhpoo.rimetlauncher.util.SpKey;
+import top.zhpoo.rimetlauncher.util.SpManager;
+import top.zhpoo.rimetlauncher.util.Toasts;
 
 public class MainActivity extends AgileActivity implements OnClickListener {
 
-    private static final int DEFAULT_BACK_DELAY_MILLIS = 30 * 1000;
+    private static final int DEFAULT_BACK_DELAY_SECONDS = 30;
     private static final long ONE_DAY = 24 * 60 * 60 * 1000;
 
     private final Handler mHandler = new Handler();
@@ -35,36 +37,36 @@ public class MainActivity extends AgileActivity implements OnClickListener {
         Logger.d("back .");
         start();
     };
-    private int backDelayMillis = DEFAULT_BACK_DELAY_MILLIS;
+    private Integer mBackDelaySeconds;
+    private Integer mFloatingTimeMinutes;
 
     private final Runnable mRunnable = () -> {
         final Context context = App.getContext();
         final PackageManager pm = context.getPackageManager();
         Intent intent = pm.getLaunchIntentForPackage(PackageName.DING_DING);
         if (intent == null) {
-            Toast.makeText(context, "package not installed (or has no launcher activity): " + PackageName.DING_DING, Toast.LENGTH_SHORT).show();
+            Toasts.show("package not installed (or has no launcher activity): " + PackageName.DING_DING);
             return;
         }
 
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         context.startActivity(intent);
         Logger.d("ding .");
-        mHandler.postDelayed(mBackRunner, backDelayMillis);
+        mHandler.postDelayed(mBackRunner, mBackDelaySeconds * 1000);
     };
     private Button mButton;
     private CountDownTimer mTimer;
 
     private Button mBtnWorkTime;
     private Button mBtnOffTime;
-    private EditText mEtStayInDingdingTime;
-    private EditText mEtFloatingTime;
+    private EditText mEtBackDelaySeconds;
+    private EditText mEtFloatingTimeMinutes;
 
     private Integer mHour1;
     private Integer mMinute1;
 
     private Integer mHour2;
     private Integer mMinute2;
-
 
     @Override
     protected boolean autoHideKeyboardOnTouchEditTextOutside(MotionEvent ev) {
@@ -80,37 +82,59 @@ public class MainActivity extends AgileActivity implements OnClickListener {
 
         mBtnWorkTime = findViewById(R.id.btn_work_time);
         mBtnOffTime = findViewById(R.id.btn_off_time);
-        mEtStayInDingdingTime = findViewById(R.id.et_stay_in_dingding_time);
-        mEtFloatingTime = findViewById(R.id.et_floating_time);
+        mEtBackDelaySeconds = findViewById(R.id.et_stay_in_dingding_time);
+        mEtFloatingTimeMinutes = findViewById(R.id.et_floating_time);
 
         mBtnWorkTime.setOnClickListener(this);
         mBtnOffTime.setOnClickListener(this);
-        updateSettingText();
+
+        readSavedSettings();
+
+        updateTime1Text();
+        updateTime2Text();
+
+        mEtBackDelaySeconds.setText(mBackDelaySeconds == null ? null : mBackDelaySeconds.toString());
+        mEtBackDelaySeconds.setSelection(mEtBackDelaySeconds.getText().length());
+
+        mEtFloatingTimeMinutes.setText(mFloatingTimeMinutes == null ? null : mFloatingTimeMinutes.toString());
+        mEtFloatingTimeMinutes.setSelection(mEtFloatingTimeMinutes.getText().length());
     }
 
-    private void updateSettingText() {
+    private void readSavedSettings() {
+        SpManager sp = SpManager.getInstance();
+        int spInt = sp.getInt(SpKey.TIME_HOUR1, -1);
+        mHour1 = spInt == -1 ? null : spInt;
+
+        spInt = sp.getInt(SpKey.TIME_MINUTE1, -1);
+        mMinute1 = spInt == -1 ? null : spInt;
+
+        spInt = sp.getInt(SpKey.TIME_HOUR2, -1);
+        mHour2 = spInt == -1 ? null : spInt;
+
+        spInt = sp.getInt(SpKey.TIME_MINUTE2, -1);
+        mMinute2 = spInt == -1 ? null : spInt;
+
+        spInt = sp.getInt(SpKey.TIME_FLOATING_MINUTES, -1);
+        mFloatingTimeMinutes = spInt == -1 ? null : spInt;
+
+        spInt = sp.getInt(SpKey.BACK_DELAY_SECONDS, -1);
+        mBackDelaySeconds = spInt == -1 ? null : spInt;
+    }
+
+    private void updateTime1Text() {
         String time1 = mHour1 == null ? "" : "\n" + twoDigits(mHour1) + ":" + twoDigits(mMinute1);
-        String time2 = mHour2 == null ? "" : "\n" + twoDigits(mHour2) + ":" + twoDigits(mMinute2);
-
         mBtnWorkTime.setText(getString(R.string.setupTime1, time1));
-        mBtnOffTime.setText(getString(R.string.setupTime2, time2));
     }
 
-    private String twoDigits(long value) {
-        return value < 10 ? "0" + value : "" + value;
+    private void updateTime2Text() {
+        String time2 = mHour2 == null ? "" : "\n" + twoDigits(mHour2) + ":" + twoDigits(mMinute2);
+        mBtnOffTime.setText(getString(R.string.setupTime2, time2));
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         stop();
-    }
-
-    private void cancelTimer() {
-        if (mTimer != null) {
-            mTimer.cancel();
-            mTimer = null;
-        }
     }
 
     @Override
@@ -120,38 +144,87 @@ public class MainActivity extends AgileActivity implements OnClickListener {
                 if (isRunning()) {
                     stop();
                     mButton.setText(R.string.start);
-                    mEtFloatingTime.setEnabled(true);
-                    mEtStayInDingdingTime.setEnabled(true);
-                } else if (start()) {
-                    mEtFloatingTime.setEnabled(false);
-                    mEtStayInDingdingTime.setEnabled(false);
+                    mEtFloatingTimeMinutes.setEnabled(true);
+                    mEtBackDelaySeconds.setEnabled(true);
+                } else if (prepareStart() && start()) {
+                    mEtFloatingTimeMinutes.setEnabled(false);
+                    mEtBackDelaySeconds.setEnabled(false);
                 }
                 break;
             case R.id.btn_work_time:
                 if (isRunning()) {
-                    toast(R.string.stopTips);
+                    Toasts.show(R.string.stopTips);
                 } else {
                     TimePickerDialog dialog = new TimePickerDialog(this, (view, hourOfDay, minute) -> {
                         mHour1 = hourOfDay;
                         mMinute1 = minute;
-                        updateSettingText();
+                        updateTime1Text();
+                        SpManager sp = SpManager.getInstance();
+                        sp.edit().putInt(SpKey.TIME_HOUR1, mHour1).putInt(SpKey.TIME_MINUTE1, mMinute1).apply();
                     }, mHour1 == null ? 0 : mHour1, mMinute1 == null ? 0 : mMinute1, true);
                     dialog.show();
                 }
                 break;
             case R.id.btn_off_time:
                 if (isRunning()) {
-                    toast(R.string.stopTips);
+                    Toasts.show(R.string.stopTips);
                 } else {
                     TimePickerDialog dialog = new TimePickerDialog(this, (view, hourOfDay, minute) -> {
                         mHour2 = hourOfDay;
                         mMinute2 = minute;
-                        updateSettingText();
+                        updateTime2Text();
+                        SpManager sp = SpManager.getInstance();
+                        sp.edit().putInt(SpKey.TIME_HOUR2, mHour2).putInt(SpKey.TIME_MINUTE2, mMinute2).apply();
                     }, mHour2 == null ? 0 : mHour2, mMinute2 == null ? 0 : mMinute2, true);
                     dialog.show();
                 }
                 break;
         }
+    }
+
+    private boolean prepareStart() {
+        if (mHour1 == null && mHour2 == null) {
+            Toasts.show(R.string.setupTimeTips1);
+            return false;
+        }
+
+        mFloatingTimeMinutes = 0;
+        String floatingTime = mEtFloatingTimeMinutes.getText().toString().trim();
+        if (!TextUtils.isEmpty(floatingTime)) {
+            try {
+                mFloatingTimeMinutes = Math.abs(Integer.parseInt(floatingTime));
+                SpManager.getInstance().putInt(SpKey.TIME_FLOATING_MINUTES, mFloatingTimeMinutes);
+            } catch (NumberFormatException e) {
+                Toasts.show(R.string.invalidNumber);
+                mEtFloatingTimeMinutes.setText(null);
+                SpManager.getInstance().remove(SpKey.TIME_FLOATING_MINUTES);
+            }
+        } else {
+            SpManager.getInstance().remove(SpKey.TIME_FLOATING_MINUTES);
+        }
+
+        mBackDelaySeconds = DEFAULT_BACK_DELAY_SECONDS;
+        String backTimeStr = mEtBackDelaySeconds.getText().toString().trim();
+        if (!TextUtils.isEmpty(backTimeStr)) {
+            try {
+                int backTimeSeconds = Integer.parseInt(backTimeStr);
+                if (backTimeSeconds <= 0) {
+                    Toasts.show(R.string.invalidNumber);
+                    mEtBackDelaySeconds.setText(null);
+                    SpManager.getInstance().remove(SpKey.BACK_DELAY_SECONDS);
+                } else {
+                    mBackDelaySeconds = backTimeSeconds;
+                    SpManager.getInstance().putInt(SpKey.BACK_DELAY_SECONDS, backTimeSeconds);
+                }
+            } catch (NumberFormatException e) {
+                Toasts.show(R.string.invalidNumber);
+                mEtBackDelaySeconds.setText(null);
+                SpManager.getInstance().remove(SpKey.BACK_DELAY_SECONDS);
+            }
+        } else {
+            SpManager.getInstance().remove(SpKey.BACK_DELAY_SECONDS);
+        }
+        return true;
     }
 
     private boolean start() {
@@ -179,7 +252,7 @@ public class MainActivity extends AgileActivity implements OnClickListener {
             after.set(Calendar.MILLISECOND, 0);
         }
         if (before == null && after == null) {
-            toast(R.string.setupTimeTips1);
+            Toasts.show(R.string.setupTimeTips1);
             return false;
         }
         if (before == null) {
@@ -211,47 +284,24 @@ public class MainActivity extends AgileActivity implements OnClickListener {
 
         long delay = next.getTimeInMillis() - current;
 
-        String floatingTime = mEtFloatingTime.getText().toString().trim();
-        if (!TextUtils.isEmpty(floatingTime)) {
-            try {
-                int i = Math.abs(Integer.parseInt(floatingTime));
-                int randomInt = new Random().nextInt(i * 2) - i;
-                delay += randomInt * 60 * 1000;
-            } catch (NumberFormatException e) {
-                toast(R.string.invalidNumber);
-                mEtFloatingTime.setText("");
-            }
+        if (mFloatingTimeMinutes > 0) {
+            int floatingTimeMs = mFloatingTimeMinutes * 60 * 1000;
+            int randomInt = new Random().nextInt(floatingTimeMs * 2) - floatingTimeMs;
+            delay += randomInt;
         }
 
-        backDelayMillis = DEFAULT_BACK_DELAY_MILLIS;
-        String backTimeStr = mEtStayInDingdingTime.getText().toString().trim();
-        if (!TextUtils.isEmpty(backTimeStr)) {
-            try {
-                int backTime = Integer.parseInt(backTimeStr);
-                if (backTime <= 0) {
-                    mEtStayInDingdingTime.setText("");
-                } else {
-                    backDelayMillis = backTime * 1000;
-                }
-            } catch (NumberFormatException e) {
-                toast(R.string.invalidNumber);
-                mEtStayInDingdingTime.setText("");
-            }
-        }
-
-        start(delay);
+        mHandler.postDelayed(mRunnable, delay);
         startTimer(delay);
         return true;
     }
 
-    private void toast(int resId) {
-        Toast.makeText(App.getContext(), resId, Toast.LENGTH_SHORT).show();
+    private void stop() {
+        mHandler.removeCallbacksAndMessages(null);
+        cancelTimer();
     }
 
-    @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        Logger.d("onNewIntent: %s", intent.toString());
+    private boolean isRunning() {
+        return mHandler.hasCallbacks(mRunnable);
     }
 
     private void startTimer(long millisInFuture) {
@@ -263,27 +313,24 @@ public class MainActivity extends AgileActivity implements OnClickListener {
                 long minute = millisUntilFinished / 1000 / 60 % 60;
                 long second = millisUntilFinished / 1000 % 60;
                 String leftTime = twoDigits(hour) + ":" + twoDigits(minute) + ":" + twoDigits(second);
-                mButton.setText(getString(R.string.exchangeTime, leftTime, backDelayMillis / 1000));
+                mButton.setText(getString(R.string.exchangeTime, leftTime, mBackDelaySeconds));
             }
 
             @Override
             public void onFinish() {
-
             }
         };
         mTimer.start();
     }
 
-    private boolean isRunning() {
-        return mHandler.hasCallbacks(mRunnable);
+    private void cancelTimer() {
+        if (mTimer != null) {
+            mTimer.cancel();
+            mTimer = null;
+        }
     }
 
-    private void start(long delayTime) {
-        mHandler.postDelayed(mRunnable, delayTime);
-    }
-
-    private void stop() {
-        mHandler.removeCallbacksAndMessages(null);
-        cancelTimer();
+    private String twoDigits(long value) {
+        return value < 10 ? "0" + value : "" + value;
     }
 }
